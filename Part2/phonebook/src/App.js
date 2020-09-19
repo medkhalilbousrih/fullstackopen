@@ -1,33 +1,45 @@
 import React, { useState, useEffect } from "react";
 import Filter from "./components/filter";
-import axios from "axios";
-const App = () => {
+import Notification from "./components/notification";
+import { create, getData, removeP, update } from "./services/persons";
 
+const App = () => {
   const [persons, setPersons] = useState([]);
   const [newName, setNewName] = useState("");
   const [newNumber, setNewNumber] = useState("");
   const [newFilter, setNewFilter] = useState("");
+  const [message, setMessage] = useState(null);
 
   useEffect(() => {
-    axios
-      .get("http://localhost:3001/")
-      .then((response) => setPersons(response.data));
+    getData()
+      .then((data) => {
+        setPersons(data);
+      })
+      .catch((error) => {
+        console.log(error);
+      });
   }, []);
-
-  console.log(persons);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    for (let p of persons) {
-      if (p.name === newName) {
-        alert(`${newName} already added to phonebook`);
-        setNewName("");
-        return;
+    const person = {
+      name: newName,
+      number: newNumber,
+    };
+    if (persons.find((p) => p.name === person.name)) {
+      if (window.confirm("update phone number")) {
+        const id = persons.find((p) => p.name === person.name).id;
+        update(id, person).then((obj) => {
+          setPersons(persons.map((p) => (p.id !== obj.id ? p : obj)));
+        });
       }
+    } else {
+      create(person).then((obj) => {
+        setPersons(persons.concat(obj));
+        setNewName("");
+        setNewNumber("");
+      });
     }
-    setPersons(persons.concat({ name: newName, number: newNumber }));
-    setNewName("");
-    setNewNumber("");
   };
 
   const handleNameChange = (e) => {
@@ -42,20 +54,36 @@ const App = () => {
     setNewFilter(e.target.value);
   };
 
+  const handleClick = (p) => {
+    if (window.confirm("delete " + p.name))
+      removeP(p.id)
+        .then(() => {
+          setPersons(persons.filter((p1) => p.id !== p1.id));
+          setMessage("deleted");
+        })
+        .catch((error) => {
+          console.log("already deleted");
+          setPersons(persons.filter((p1) => p.id !== p1.id));
+        });
+  };
+
   const show = () => {
     const list = persons.filter((p) => p.name.includes(newFilter));
     return list.map((p) => (
-      <p key={p.name}>
-        {p.name} {p.number}
+      <p key={p.id}>
+        {p.name} {p.number}{" "}
+        <button onClick={() => handleClick(p)}>delete</button>
       </p>
     ));
   };
 
   return (
     <div>
-      <h2>Phonebook</h2>
+      <h1>Phonebook</h1>
+      <Notification  message={message}/>
       <Filter newFilter={newFilter} handleFilterChange={handleFilterChange} />
       <form onSubmit={handleSubmit}>
+        <h2>add a new</h2>
         <div>
           name: <input value={newName} onChange={handleNameChange} />
         </div>
